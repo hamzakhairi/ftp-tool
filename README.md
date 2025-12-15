@@ -1,2 +1,0 @@
-# ftp-tool
-ee
